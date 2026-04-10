@@ -1,26 +1,18 @@
 import express, { Request, Response } from "express"
 import cors from "cors"
 import { toNodeHandler } from "better-auth/node";
-import { auth } from "./lib/auth";
-import { tutorRouter } from "./modules/tutor/tutor.routes";
-import { categoryRouter } from "./modules/categories/categories.routes";
-import { availabilityRouter } from "./modules/availability/availability.routes";
-import { bookingRouter } from "./modules/bookings/bookings.routes";
-import { reviewRouter } from "./modules/review/review.routes";
-import { tutorCategoryRouter } from "./modules/tutorCategory/tutorCategory.routes";
-import { adminRouter } from "./modules/admin/admin.routes";
-import { adminAnalyticsRouter } from "./modules/adminAnalytic/adminAnalytic.routes";
-import { usersRouter } from "./modules/users/user.routes";
-import { authRouter } from "./modules/auth/auth.router";
-import errorHandler from "./middleware/globalErrorHandler";
-import { notFound } from "./middleware/notFound";
+import { indexRoutes } from "./app/routes";
+import { auth } from "./app/lib/auth";
+import errorHandler from "./app/middleware/globalErrorHandler";
+import { notFound } from "./app/middleware/notFound";
+import { envVars } from "./app/config/env.config";
 
 const app = express();
 app.use(express.json());
 
 const allowedOrigins = [
-  process.env.APP_URL || "http://localhost:3000",
-  process.env.PROD_APP_URL, // Production frontend URL
+  envVars.APP_URL || "http://localhost:3000",
+  envVars.PROD_APP_URL, // Production frontend URL
 ].filter(Boolean); // Remove undefined values
 
 app.use(
@@ -32,7 +24,7 @@ app.use(
       const isAllowed =
         allowedOrigins.includes(origin) ||
         /^https:\/\/next-blog-client.*\.vercel\.app$/.test(origin) ||
-        /^https:\/\/.*\.vercel\.app$/.test(origin); 
+        /^https:\/\/.*\.vercel\.app$/.test(origin);
 
       if (isAllowed) {
         callback(null, true);
@@ -50,33 +42,15 @@ app.use(
 // better auth 
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
-app.use("/api/tutors", tutorRouter);
-
-app.use("/api/categories", categoryRouter);
-
-app.use("/api/availability", availabilityRouter);
-
-app.use("/api/bookings", bookingRouter);
-
-app.use("/api/reviews", reviewRouter);
-
-app.use("/api/tutor-categories", tutorCategoryRouter);
-
-app.use("/api/admin", adminRouter);
-
-app.use("/api/adminAnalytic", adminAnalyticsRouter);
-
-app.use("/api/users", usersRouter);
-
-app.use("/api/me", authRouter);
+app.use("/api/v1", indexRoutes);
 
 // global error handler
 app.use(errorHandler);
 // not found
 app.use(notFound);
 
-app.get("", (req : Request, res: Response)=>{
-    res.send("Hello world!");
+app.get("", (req: Request, res: Response) => {
+  res.send("Hello world!");
 });
 
 export default app;

@@ -1,0 +1,382 @@
+import status from "http-status";
+import { auth } from "../../lib/auth";
+import { prisma } from "../../lib/prisma";
+import { tokenUtils } from "../../utils/token";
+import { IRequestUser } from "../../interface/requestUser.interface";
+import { jwtUtils } from "../../utils/jwt";
+import { JwtPayload } from "jsonwebtoken";
+import { IChangePasswordPayload, IRegisterUserPayload, IResetPasswordPayload, ISignInUserPayload } from "./auth.interface";
+import { Role, UserStatus } from "../../../../generated/prisma/enums";
+import AppError from "../../errorHelpers/appError";
+import { envVars } from "../../config/env.config";
+
+const registerUser = async (payload: IRegisterUserPayload): Promise<any> => {
+  const { name, email, password, role, tutorProfile } = payload;
+
+  const data = await auth.api.signUpEmail({
+    body: {
+      name,
+      email,
+      password,
+      role: role || Role.STUDENT,
+    },
+  });
+
+  try {
+    const userRole = data.user.role as Role;
+
+    await prisma.$transaction(async (tx) => {
+      // If the user registered as a Tutor, forcefully ensure TutorProfile is created
+      if (userRole === Role.TUTOR) {
+        await tx.tutorProfile.create({
+          data: {
+            userId: data.user.id,
+            pricePerHour: tutorProfile?.pricePerHour ?? 0,
+            experience: tutorProfile?.experience ?? 0,
+            bio: tutorProfile?.bio || null,
+          },
+        });
+      }
+    });
+
+    // In a fresh signup, user status is dynamically default ACTIVE
+    const accessToken = tokenUtils.getAccessToken({
+      userId: data.user.id,
+      role: userRole,
+      name: data.user.name,
+      email: data.user.email,
+      status: UserStatus.ACTIVE,
+      emailVerified: data.user.emailVerified,
+    });
+
+    const refreshToken = tokenUtils.getRefreshToken({
+      userId: data.user.id,
+      role: userRole,
+      name: data.user.name,
+      email: data.user.email,
+      status: UserStatus.ACTIVE,
+      emailVerified: data.user.emailVerified,
+    });
+
+    return {
+      ...data,
+      accessToken,
+      refreshToken,
+    };
+  } catch (error) {
+    console.log("Transaction error: ", error);
+    // rollback user creation if profile creation fails
+    await prisma.user.delete({
+      where: {
+        id: data.user.id,
+      },
+    });
+
+    throw error;
+  }
+};
+
+const loginUser = async (payload: ISignInUserPayload): Promise<any> => {
+  const { email, password } = payload;
+
+  const data = await auth.api.signInEmail({
+    body: {
+      email,
+      password,
+    },
+  });
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: data.user.id }
+  });
+
+  if (!dbUser || dbUser.status === UserStatus.BANNED) {
+    throw new AppError(status.BAD_REQUEST, "User is banned or not found!");
+  }
+
+  const accessToken = tokenUtils.getAccessToken({
+    userId: dbUser.id,
+    role: dbUser.role as Role,
+    name: dbUser.name,
+    email: dbUser.email,
+    status: dbUser.status as UserStatus,
+    emailVerified: dbUser.emailVerified,
+  });
+
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: dbUser.id,
+    role: dbUser.role as Role,
+    name: dbUser.name,
+    email: dbUser.email,
+    status: dbUser.status as UserStatus,
+    emailVerified: dbUser.emailVerified,
+  });
+
+  return {
+    ...data,
+    accessToken,
+    refreshToken,
+  };
+};
+
+const getMe = async (user: IRequestUser) => {
+  const isUserExists = await prisma.user.findUnique({
+    where: {
+      id: user.userId,
+    },
+    include: {
+      tutorProfile: {
+        include: {
+          categories: true,
+          availability: true,
+          reviews: true,
+        }
+      },
+      studentBookings: {
+        include: {
+          tutor: true,
+          // @ts-ignore
+          payment: true,
+          review: true,
+        }
+      },
+    },
+  });
+
+  if (!isUserExists) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  return isUserExists;
+};
+
+const getNewToken = async (refreshToken: string, sessionToken: string): Promise<any> => {
+  const isSessionTokenExists = await prisma.session.findUnique({
+    where: {
+      token: sessionToken,
+    },
+    include: {
+      user: true,
+    },
+  });
+
+  if (!isSessionTokenExists) {
+    throw new AppError(status.UNAUTHORIZED, "Invalid refresh Token!");
+  }
+
+  if (isSessionTokenExists.user.status === UserStatus.BANNED) {
+    throw new AppError(status.BAD_REQUEST, "User is banned!");
+  }
+
+  const verifiedRefreshToken = jwtUtils.verifyToken(
+    refreshToken,
+    envVars.REFRESH_TOKEN_SECRET,
+  );
+
+  if (!verifiedRefreshToken.success && verifiedRefreshToken.error) {
+    throw new AppError(status.UNAUTHORIZED, "Invalid refresh Token!");
+  }
+
+  const data = verifiedRefreshToken.data as JwtPayload;
+
+  const newAccessToken = tokenUtils.getAccessToken({
+    userId: data.userId,
+    role: isSessionTokenExists.user.role as Role,
+    name: data.name,
+    email: data.email,
+    status: isSessionTokenExists.user.status as UserStatus,
+    emailVerified: isSessionTokenExists.user.emailVerified,
+  });
+
+  const NewRefreshToken = tokenUtils.getRefreshToken({
+    userId: data.userId,
+    role: isSessionTokenExists.user.role as Role,
+    name: data.name,
+    email: data.email,
+    status: isSessionTokenExists.user.status as UserStatus,
+    emailVerified: isSessionTokenExists.user.emailVerified,
+  });
+
+  const { token } = await prisma.session.update({
+    where: {
+      token: sessionToken,
+    },
+    data: {
+      expiresAt: new Date(Date.now() + 60 * 60 * 24 * 1000),
+      updatedAt: new Date(),
+    },
+  });
+
+  return {
+    accessToken: newAccessToken,
+    refreshToken: NewRefreshToken,
+    sessionToken: token,
+  };
+};
+
+const changePassword = async (payload: IChangePasswordPayload, sessionToken: string): Promise<any> => {
+  const session = await auth.api.getSession({
+    headers: new Headers({
+      Authorization: `Bearer ${sessionToken}`,
+    }),
+  });
+
+  if (!session) {
+    throw new AppError(status.UNAUTHORIZED, "Invalid session token!");
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id }
+  });
+
+  if (!dbUser) {
+    throw new AppError(status.UNAUTHORIZED, "User not found!");
+  }
+
+  const { currentPassword, newPassword } = payload;
+
+  const result = await auth.api.changePassword({
+    body: {
+      currentPassword,
+      newPassword,
+      revokeOtherSessions: true,
+    },
+    headers: new Headers({
+      Authorization: `Bearer ${sessionToken}`,
+    }),
+  });
+
+  // @ts-ignore
+  if (dbUser.needPasswordChanged) {
+    await prisma.user.update({
+      where: {
+        id: session.user.id,
+      },
+      data: {
+        needPasswordChanged: false,
+      }
+    });
+  }
+
+  const accessToken = tokenUtils.getAccessToken({
+    userId: dbUser.id,
+    role: dbUser.role as Role,
+    name: dbUser.name,
+    email: dbUser.email,
+    status: dbUser.status as UserStatus,
+    emailVerified: dbUser.emailVerified,
+  });
+
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: dbUser.id,
+    role: dbUser.role as Role,
+    name: dbUser.name,
+    email: dbUser.email,
+    status: dbUser.status as UserStatus,
+    emailVerified: dbUser.emailVerified,
+  });
+
+  return {
+    ...result,
+    accessToken,
+    refreshToken,
+  };
+};
+
+const signOut = async (headers: any) => {
+  return await auth.api.signOut({ headers });
+};
+
+const verifyEmail = async (token: string) => {
+  await auth.api.verifyEmail({
+    query: {
+      token,
+    },
+  });
+};
+
+const forgetPassword = async (email: string) => {
+  const isUserExist = await prisma.user.findUnique({
+    where: {
+      email,
+    }
+  });
+
+  if (!isUserExist) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  if (!isUserExist.emailVerified) {
+    throw new AppError(status.BAD_REQUEST, "Email not verified");
+  }
+
+  if (isUserExist.status === UserStatus.BANNED) {
+    throw new AppError(status.NOT_FOUND, "User not found or banned");
+  }
+
+  await auth.api.requestPasswordReset({
+    body: {
+      email,
+      redirectTo: `${envVars.APP_URL}/reset-password`,
+    }
+  });
+};
+
+const resetPassword = async (payload: IResetPasswordPayload): Promise<any> => {
+  const { token, newPassword } = payload;
+  const result = await auth.api.resetPassword({
+    body: {
+      token,
+      newPassword,
+    }
+  });
+
+  return result;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const googleLoginSuccess = async (session: Record<string, any>) => {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id }
+  });
+
+  if (dbUser?.status === UserStatus.BANNED) {
+    throw new AppError(status.BAD_REQUEST, "User is banned!");
+  }
+
+  const accessToken = tokenUtils.getAccessToken({
+    userId: session.user.id,
+    role: dbUser?.role || session.user.role,
+    name: session.user.name,
+    email: session.user.email,
+    status: dbUser?.status || UserStatus.ACTIVE,
+    emailVerified: true
+  });
+
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: session.user.id,
+    role: dbUser?.role || session.user.role,
+    name: session.user.name,
+    email: session.user.email,
+    status: dbUser?.status || UserStatus.ACTIVE,
+    emailVerified: true
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const authServices = {
+  registerUser,
+  loginUser,
+  getMe,
+  getNewToken,
+  changePassword,
+  signOut,
+  verifyEmail,
+  forgetPassword,
+  resetPassword,
+  googleLoginSuccess,
+};

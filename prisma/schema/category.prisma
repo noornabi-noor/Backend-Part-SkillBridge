@@ -1,0 +1,11 @@
+model Category {
+    id        String   @id @default(uuid())
+    name      String   @unique
+    icon      String?  @db.VarChar(255)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    tutors TutorCategory[]
+
+    @@map("categories")
+}

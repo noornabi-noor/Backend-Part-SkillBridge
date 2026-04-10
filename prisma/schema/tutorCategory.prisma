@@ -1,0 +1,11 @@
+model TutorCategory {
+    id         String @id @default(uuid())
+    tutorId    String
+    categoryId String
+
+    tutor    TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+    category Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+    @@unique([tutorId, categoryId])
+    @@map("tutor_categories")
+}

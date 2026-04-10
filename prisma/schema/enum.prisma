@@ -1,0 +1,24 @@
+enum Role {
+    STUDENT
+    TUTOR
+    ADMIN
+}
+
+enum BookingStatus {
+    PENDING
+    CONFIRMED
+    COMPLETED
+    CANCELLED
+}
+
+enum UserStatus {
+    ACTIVE
+    BANNED
+}
+
+enum PaymentStatus {
+    PENDING
+    COMPLETED
+    FAILED
+    REFUNDED
+}
