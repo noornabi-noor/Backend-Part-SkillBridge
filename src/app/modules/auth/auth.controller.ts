@@ -175,25 +175,28 @@ const verifyEmail = catchAsync(async (req: Request, res: Response) => {
 });
 
 const forgetPassword = catchAsync(async (req: Request, res: Response) => {
-  await authServices.forgetPassword(req.body.email);
+    const { email } = req.body;
 
-  sendResponse(res, {
-    httpStatusCode: status.OK,
-    success: true,
-    message: "Password reset email sent successfully",
-  });
+    await authServices.forgetPassword(email);
+
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: "Password reset OTP sent to email successfully",
+    });
 });
 
 const resetPassword = catchAsync(async (req: Request, res: Response) => {
-  const result = await authServices.resetPassword(req.body);
+    const { email, otp, newPassword } = req.body;
 
-  sendResponse(res, {
-    httpStatusCode: status.OK,
-    success: true,
-    message: "Password reset successfully",
-    data: result,
-  });
-});
+    await authServices.resetPassword(email, otp, newPassword);
+
+    sendResponse(res, {
+        httpStatusCode: status.OK,
+        success: true,
+        message: "Password reset successfully",
+    });
+}); 
 
 // /api/v1/auth/login/google?redirect=/profile
 const googleLogin = catchAsync((req: Request, res: Response) => {

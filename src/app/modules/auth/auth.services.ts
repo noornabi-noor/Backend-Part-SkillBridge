@@ -316,7 +316,7 @@ const forgetPassword = async (email: string) => {
     where: {
       email,
     }
-  });
+  })
 
   if (!isUserExist) {
     throw new AppError(status.NOT_FOUND, "User not found");
@@ -326,28 +326,61 @@ const forgetPassword = async (email: string) => {
     throw new AppError(status.BAD_REQUEST, "Email not verified");
   }
 
-  if (isUserExist.status === UserStatus.BANNED) {
-    throw new AppError(status.NOT_FOUND, "User not found or banned");
+  if (isUserExist.isDeleted || isUserExist.status === UserStatus.DELETED) {
+    throw new AppError(status.NOT_FOUND, "User not found");
   }
 
-  await auth.api.requestPasswordReset({
+  await auth.api.sendVerificationOTP({
     body: {
       email,
-      redirectTo: `${envVars.APP_URL}/reset-password`,
+      type: "forget-password",
     }
-  });
+  })
 };
 
-const resetPassword = async (payload: IResetPasswordPayload): Promise<any> => {
-  const { token, newPassword } = payload;
-  const result = await auth.api.resetPassword({
-    body: {
-      token,
-      newPassword,
+const resetPassword = async (email: string, otp: string, newPassword: string) => {
+  const isUserExist = await prisma.user.findUnique({
+    where: {
+      email,
     }
-  });
+  })
 
-  return result;
+  if (!isUserExist) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  if (!isUserExist.emailVerified) {
+    throw new AppError(status.BAD_REQUEST, "Email not verified");
+  }
+
+  if (isUserExist.isDeleted || isUserExist.status === UserStatus.DELETED) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  await auth.api.resetPasswordEmailOTP({
+    body: {
+      email,
+      otp,
+      password: newPassword,
+    }
+  })
+
+  if (isUserExist.needPasswordChanged) {
+    await prisma.user.update({
+      where: {
+        id: isUserExist.id,
+      },
+      data: {
+        needPasswordChanged: false,
+      }
+    })
+  }
+
+  await prisma.session.deleteMany({
+    where: {
+      userId: isUserExist.id,
+    }
+  })
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

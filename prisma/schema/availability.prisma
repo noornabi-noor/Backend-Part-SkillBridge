@@ -1,15 +1,13 @@
 model Availability {
-    id        String  @id @default(uuid())
-    tutorId   String
-    dayOfWeek Int
-    startTime String
-    endTime   String
-    isBooked  Boolean @default(false)
+  id        String       @id @default(uuid())
+  tutorId   String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isBooked  Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
 
-    tutor TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@map("availability")
+  @@map("availability")
 }
