@@ -135,7 +135,6 @@ const getMe = async (user: IRequestUser) => {
       studentBookings: {
         include: {
           tutor: true,
-          // @ts-ignore
           payment: true,
           review: true,
         }
@@ -214,7 +213,7 @@ const getNewToken = async (refreshToken: string, sessionToken: string): Promise<
   };
 };
 
-const changePassword = async (payload: IChangePasswordPayload, sessionToken: string): Promise<any> => {
+const changePassword = async (payload: IChangePasswordPayload, sessionToken: string) => {
   const session = await auth.api.getSession({
     headers: new Headers({
       Authorization: `Bearer ${sessionToken}`,
@@ -223,14 +222,6 @@ const changePassword = async (payload: IChangePasswordPayload, sessionToken: str
 
   if (!session) {
     throw new AppError(status.UNAUTHORIZED, "Invalid session token!");
-  }
-
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id }
-  });
-
-  if (!dbUser) {
-    throw new AppError(status.UNAUTHORIZED, "User not found!");
   }
 
   const { currentPassword, newPassword } = payload;
@@ -246,24 +237,31 @@ const changePassword = async (payload: IChangePasswordPayload, sessionToken: str
     }),
   });
 
-  // @ts-ignore
+  // 1. Fetch fresh user data from database after password change
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id }
+  });
+
+  if (!dbUser) {
+    throw new AppError(status.NOT_FOUND, "User not found after password change!");
+  }
+
+  // 2. Clear needPasswordChanged flag if it was set
   if (dbUser.needPasswordChanged) {
     await prisma.user.update({
-      where: {
-        id: session.user.id,
-      },
-      data: {
-        needPasswordChanged: false,
-      }
+      where: { id: dbUser.id },
+      data: { needPasswordChanged: false }
     });
   }
 
+  // 3. Generate tokens with fresh database data
   const accessToken = tokenUtils.getAccessToken({
     userId: dbUser.id,
     role: dbUser.role as Role,
     name: dbUser.name,
     email: dbUser.email,
     status: dbUser.status as UserStatus,
+    isDeleted: dbUser.isDeleted,
     emailVerified: dbUser.emailVerified,
   });
 
@@ -273,6 +271,7 @@ const changePassword = async (payload: IChangePasswordPayload, sessionToken: str
     name: dbUser.name,
     email: dbUser.email,
     status: dbUser.status as UserStatus,
+    isDeleted: dbUser.isDeleted,
     emailVerified: dbUser.emailVerified,
   });
 
@@ -280,19 +279,36 @@ const changePassword = async (payload: IChangePasswordPayload, sessionToken: str
     ...result,
     accessToken,
     refreshToken,
+    token: sessionToken,
   };
 };
 
-const signOut = async (headers: any) => {
-  return await auth.api.signOut({ headers });
+const logoutStudent = async (sessionToken: string) => {
+  await auth.api.signOut({
+    headers: new Headers({
+      Authorization: `Bearer ${sessionToken}`,
+    }),
+  });
 };
 
-const verifyEmail = async (token: string) => {
-  await auth.api.verifyEmail({
-    query: {
-      token,
+const verifyEmail = async (email: string, otp: string) => {
+  const result = await auth.api.verifyEmailOTP({
+    body: {
+      email,
+      otp,
     },
   });
+
+  if (result.status && !result.user.emailVerified) {
+    await prisma.user.update({
+      where: {
+        email,
+      },
+      data: {
+        emailVerified: true,
+      }
+    })
+  }
 };
 
 const forgetPassword = async (email: string) => {
@@ -374,7 +390,7 @@ export const authServices = {
   getMe,
   getNewToken,
   changePassword,
-  signOut,
+  logoutStudent,
   verifyEmail,
   forgetPassword,
   resetPassword,

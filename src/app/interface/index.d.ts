@@ -1,4 +1,4 @@
-import { userRoles } from "../middleware/auth";
+import { Role } from "../../generated/prisma/enums";
 
 declare global {
     namespace Express {
@@ -7,7 +7,7 @@ declare global {
                 id: string;
                 email: string;
                 name: string;
-                role: userRoles;
+                role: Role;
                 emailVerified: boolean;
                 tutorProfileId?: string | null;
                 image?: string;

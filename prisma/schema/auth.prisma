@@ -13,6 +13,8 @@ model User {
     role                Role       @default(STUDENT)
     status              UserStatus @default(ACTIVE)
     needPasswordChanged Boolean    @default(false)
+    isDeleted           Boolean    @default(false)
+    deletedAt           DateTime?
     timezone            String     @default("UTC")
 
     tutorProfile    TutorProfile?

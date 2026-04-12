@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { Prisma } from "../../../generated/prisma/client";
+import AppError from "../errorHelpers/appError";
 
 interface ErrorResponse {
   success: boolean;
@@ -17,6 +18,11 @@ function errorHandler(
   let statusCode = 500;
   let errorMessage = "Inter server error!!";
   let errorDetails = err;
+
+  if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    errorMessage = err.message;
+  }
 
   // PrismaClientKnownRequestError
   if (err instanceof Prisma.PrismaClientKnownRequestError) {

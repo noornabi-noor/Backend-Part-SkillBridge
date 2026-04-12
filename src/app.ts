@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express"
 import cors from "cors"
+import cookieParser from "cookie-parser";
 import { toNodeHandler } from "better-auth/node";
 import { indexRoutes } from "./app/routes";
 import { auth } from "./app/lib/auth";
@@ -9,6 +10,7 @@ import { envVars } from "./app/config/env.config";
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 
 const allowedOrigins = [
   envVars.APP_URL || "http://localhost:3000",

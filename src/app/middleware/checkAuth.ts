@@ -1,59 +1,47 @@
 import { NextFunction, Request, Response } from "express";
 import status from "http-status";
 import { prisma } from "../lib/prisma";
+import { auth } from "../lib/auth";
 import AppError from "../errorHelpers/appError";
-import { UserStatus } from "../../../generated/prisma/client";
+import { Role, UserStatus } from "../../../generated/prisma/enums";
 import { envVars } from "../config/env.config";
 import { jwtUtils } from "../utils/jwt";
 import { cookieUtils } from "../utils/cookie";
-import { userRoles } from "./auth";
 
 export const checkAuth =
-  (...authRoles: userRoles[]) =>
+  (...authRoles: Role[]) =>
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         //Session Token Verification
-        const sessionToken = cookieUtils.getCookie(
+        let sessionToken = cookieUtils.getCookie(
           req,
           "better-auth.session_token",
         );
 
+        if (!sessionToken && req.headers.authorization?.startsWith("Bearer ")) {
+          sessionToken = req.headers.authorization.split(" ")[1];
+        }
+
         if (sessionToken) {
-          const sessionExists = await prisma.session.findFirst({
-            where: {
-              token: sessionToken,
-              expiresAt: {
-                gt: new Date(),
-              },
-            },
-            include: {
-              user: {
-                include: {
-                  tutorProfile: {
-                    select: { id: true },
-                  },
-                },
-              },
-            },
+          const session = await auth.api.getSession({
+            headers: new Headers({
+              Authorization: `Bearer ${sessionToken}`,
+            }),
           });
 
-          if (sessionExists && sessionExists.user) {
-            const user = sessionExists.user;
+          if (session && session.user) {
+            // Fetch the user with tutorProfileId if it exists
+            const user = await prisma.user.findUnique({
+              where: { id: session.user.id },
+              include: {
+                tutorProfile: {
+                  select: { id: true },
+                },
+              },
+            });
 
-            const now = new Date();
-            const expiresAt = new Date(sessionExists.expiresAt);
-            const createdAt = new Date(sessionExists.createdAt);
-
-            const sessionLifeTime = expiresAt.getTime() - createdAt.getTime();
-            const timeRemaining = expiresAt.getTime() - now.getTime();
-            const percentRemaining = (timeRemaining / sessionLifeTime) * 100;
-
-            if (percentRemaining < 20) {
-              res.setHeader("X-Session-Refresh", "true");
-              res.setHeader("X-Session-Expires-At", expiresAt.toISOString());
-              res.setHeader("X-Time-Remaining", timeRemaining.toString());
-
-              console.log("Session Expiring Soon!!");
+            if (!user) {
+              throw new AppError(status.UNAUTHORIZED, "User not found associated with this session.");
             }
 
             if (user.status === UserStatus.BANNED) {
@@ -63,7 +51,7 @@ export const checkAuth =
               );
             }
 
-            if (authRoles.length > 0 && !authRoles.includes(user.role as userRoles)) {
+            if (authRoles.length > 0 && !authRoles.includes(user.role as any)) {
               throw new AppError(
                 status.FORBIDDEN,
                 "Forbidden access! You do not have permission to access this resource.",
@@ -74,7 +62,7 @@ export const checkAuth =
               id: user.id,
               name: user.name,
               email: user.email,
-              role: user.role as userRoles,
+              role: user.role as Role,
               emailVerified: user.emailVerified,
               tutorProfileId: user.tutorProfile?.id ?? null,
               ...(user.image != null ? { image: user.image } : {}),
@@ -86,7 +74,11 @@ export const checkAuth =
         }
 
         //Access Token Verification
-        const accessToken = cookieUtils.getCookie(req, "accessToken");
+        let accessToken = cookieUtils.getCookie(req, "accessToken");
+
+        if (!accessToken && req.headers.authorization?.startsWith("Bearer ")) {
+          accessToken = req.headers.authorization.split(" ")[1];
+        }
 
         if (!accessToken) {
           throw new AppError(
@@ -107,16 +99,6 @@ export const checkAuth =
           );
         }
 
-        if (
-          authRoles.length > 0 &&
-          !authRoles.includes(verifiedToken.data!.role as userRoles)
-        ) {
-          throw new AppError(
-            status.FORBIDDEN,
-            "Forbidden access! You do not have permission to access this resource.",
-          );
-        }
-
         // Fetch user details for complete profile info
         const dbUser = await prisma.user.findUnique({
           where: { id: verifiedToken.data!.userId },
@@ -134,11 +116,21 @@ export const checkAuth =
           );
         }
 
+        if (
+          authRoles.length > 0 &&
+          !authRoles.includes(dbUser.role as any)
+        ) {
+          throw new AppError(
+            status.FORBIDDEN,
+            "Forbidden access! You do not have permission to access this resource.",
+          );
+        }
+
         req.user = {
           id: dbUser.id,
           name: dbUser.name,
           email: dbUser.email,
-          role: dbUser.role as userRoles,
+          role: dbUser.role as Role,
           emailVerified: dbUser.emailVerified,
           tutorProfileId: dbUser.tutorProfile?.id ?? null,
           ...(dbUser.image != null ? { image: dbUser.image } : {}),
