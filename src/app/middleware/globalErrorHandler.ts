@@ -230,10 +230,13 @@ function errorHandler(
     errorMessage = 'Resource conflict occurred.';
   }
 
+  console.error("DEBUG ERR:", err);
+
   res.status(statusCode);
   res.json({
-    message: errorMessage,
-    error: errorDetails,
+    success: false,
+    message: err.message || errorMessage,
+    error: err instanceof Error ? { stack: err.stack, ...err } : errorDetails,
   });
 }
 

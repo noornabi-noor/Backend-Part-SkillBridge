@@ -2,13 +2,26 @@ import { Request, Response } from "express";
 import { categoryServices } from "./categories.services";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
+import { uploadFileToCloudinary } from "../../config/cloudinary.config";
 
 const createCategories = catchAsync(async (req: Request, res: Response) => {
-  const result = await categoryServices.createCategories(req.body);
+  let iconUrl = undefined;
+  
+  if (req.file) {
+    const uploadResult = await uploadFileToCloudinary(req.file.buffer, req.file.originalname);
+    iconUrl = uploadResult.secure_url;
+  }
+
+  const payload = {
+    ...req.body,
+    icon: iconUrl,
+  };
+
+  const result = await categoryServices.createCategories(payload);
   sendResponse(res, {
     httpStatusCode: 201,
     success: true,
-    message: "Category created successfully",
+    message: "Category created successfully!",
     data: result,
   });
 });
@@ -36,9 +49,19 @@ const getSingleCategory = catchAsync(async (req: Request, res: Response) => {
 
 const updateCategory = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, tutorIds } = req.body;
+  
+  let iconUrl = undefined;
+  if (req.file) {
+    const uploadResult = await uploadFileToCloudinary(req.file.buffer, req.file.originalname);
+    iconUrl = uploadResult.secure_url;
+  }
 
-  const result = await categoryServices.updateCategory(id as string, { name, tutorIds });
+  const payload = {
+    ...req.body,
+    icon: iconUrl,
+  };
+
+  const result = await categoryServices.updateCategory(id as string, payload);
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,

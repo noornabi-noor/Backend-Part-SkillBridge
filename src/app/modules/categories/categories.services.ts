@@ -1,22 +1,10 @@
+import { Category } from "../../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ICategoryCreate, ICategoryUpdate } from "./categories.interface";
 
-const createCategories = async (data: ICategoryCreate): Promise<any> => {
-  const existing = await prisma.category.findFirst({
-    where: {
-      name: {
-        equals: data.name,
-        mode: "insensitive",
-      },
-    },
-  });
-
-  if (existing) {
-    throw new Error(`Category "${data.name}" already exists`);
-  }
-
+const createCategories = async (payload: Category): Promise<Category> => {
   return await prisma.category.create({
-    data,
+    data: payload,
   });
 };
 
@@ -42,7 +30,7 @@ const getAllCategory = async (): Promise<any[]> => {
                 select: {
                   name: true,
                   image: true,
-                  email: true, // optional if needed
+                  email: true, 
                 },
               },
             },
@@ -95,6 +83,10 @@ const updateCategory = async (
 
   if (data.name) {
     updateData.name = data.name;
+  }
+
+  if (data.icon) {
+    updateData.icon = data.icon;
   }
 
   if (data.tutorIds && data.tutorIds.length > 0) {
