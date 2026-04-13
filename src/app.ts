@@ -7,22 +7,23 @@ import { auth } from "./app/lib/auth";
 import errorHandler from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
 import { envVars } from "./app/config/env.config";
+import qs from "qs";
+import path from "path";
 
 const app = express();
-app.use(express.json());
-app.use(cookieParser());
+app.set("query parser", (str: string) => qs.parse(str));
+app.set("view engine", "ejs");
+app.set("views", path.resolve(process.cwd(), 'src/app/templates'));
 
 const allowedOrigins = [
   envVars.APP_URL || "http://localhost:3000",
-  envVars.PROD_APP_URL, // Production frontend URL
-].filter(Boolean); // Remove undefined values
+  envVars.PROD_APP_URL, 
+].filter(Boolean); 
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
-      // Check if origin is in allowedOrigins or matches Vercel preview pattern
       const isAllowed =
         allowedOrigins.includes(origin) ||
         /^https:\/\/next-blog-client.*\.vercel\.app$/.test(origin) ||
@@ -41,14 +42,17 @@ app.use(
   }),
 );
 
-// better auth 
-app.all("/api/auth/*splat", toNodeHandler(auth));
+// better-auth MUST be mounted BEFORE express.json() — it reads the raw body stream
+app.all("/api/auth/{*any}", toNodeHandler(auth));
+
+// JSON / body parsers come AFTER better-auth handler
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 app.use("/api/v1", indexRoutes);
 
-// global error handler
 app.use(errorHandler);
-// not found
 app.use(notFound);
 
 app.get("", (req: Request, res: Response) => {

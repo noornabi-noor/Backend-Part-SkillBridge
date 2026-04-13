@@ -19,9 +19,8 @@ router.post("/verify-email", authController.verifyEmail);
 router.post("/forgot-password", validateRequest(authValidation.forgotPasswordValidationSchema), authController.forgetPassword);
 router.post("/reset-password", validateRequest(authValidation.resetPasswordValidationSchema), authController.resetPassword);
 
-router.get("/google/login", authController.googleLogin);
-router.post("/google/success", authController.googleLoginSuccess);
-
+router.get("/login/google", authController.googleLogin);
+router.get("/google/success", authController.googleLoginSuccess);
 router.get("/oauth/error", authController.handleOAuthError);
 
 export const authRoutes = router;

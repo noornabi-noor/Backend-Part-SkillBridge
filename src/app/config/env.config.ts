@@ -8,8 +8,6 @@ interface EnvConfig {
   NODE_ENV: string;
   PORT: string;
   DATABASE_URL: string;
-  GOOGLE_CLIENT_SECRET: string;
-  GOOGLE_CLIENT_ID: string;
   APP_URL: string;
   PROD_APP_URL: string;
   BETTER_AUTH_SECRET: string;
@@ -30,7 +28,9 @@ interface EnvConfig {
     SMTP_PORT: string;
     SMTP_FROM: string;
   };
-
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_CALLBACK_URL: string;
 }
 
 const loadEnvVariables = (): EnvConfig => {
@@ -38,8 +38,6 @@ const loadEnvVariables = (): EnvConfig => {
     "NODE_ENV",
     "PORT",
     "DATABASE_URL",
-    "GOOGLE_CLIENT_SECRET",
-    "GOOGLE_CLIENT_ID",
     "APP_URL",
     "PROD_APP_URL",
     "BETTER_AUTH_SECRET",
@@ -58,6 +56,9 @@ const loadEnvVariables = (): EnvConfig => {
     "EMAIL_SENDER_SMTP_PASS",
     "EMAIL_SENDER_SMTP_PORT",
     "EMAIL_SENDER_SMTP_FROM",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_CALLBACK_URL",
   ];
 
   requiredVariables.forEach((variable) => {
@@ -73,8 +74,6 @@ const loadEnvVariables = (): EnvConfig => {
     NODE_ENV: process.env.NODE_ENV as string,
     PORT: process.env.PORT as string,
     DATABASE_URL: process.env.DATABASE_URL as string,
-    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET as string,
-    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID as string,
     APP_URL: process.env.APP_URL as string,
     PROD_APP_URL: process.env.PROD_APP_URL as string,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET as string,
@@ -95,6 +94,9 @@ const loadEnvVariables = (): EnvConfig => {
       SMTP_PORT: process.env.EMAIL_SENDER_SMTP_PORT as string,
       SMTP_FROM: process.env.EMAIL_SENDER_SMTP_FROM as string,
     },
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID as string,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET as string,
+    GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL as string,
   };
 };
 

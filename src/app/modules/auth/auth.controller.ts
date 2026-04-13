@@ -8,6 +8,7 @@ import { envVars } from "../../config/env.config";
 import { tokenUtils } from "../../utils/token";
 import AppError from "../../errorHelpers/appError";
 import { cookieUtils } from "../../utils/cookie";
+import { auth } from "../../lib/auth";
 
 const registerStudent = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
@@ -198,18 +199,25 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
     });
 }); 
 
-// /api/v1/auth/login/google?redirect=/profile
-const googleLogin = catchAsync((req: Request, res: Response) => {
-  const redirectPath = req.query.redirect || "/dashboard";
-
-  const encodedRedirectPath = encodeURIComponent(redirectPath as string);
+// Server-side: call better-auth directly, get Google OAuth URL, and redirect the browser
+const googleLogin = catchAsync(async (req: Request, res: Response) => {
+  const redirectPath = (req.query.redirect as string) || "/dashboard";
+  const encodedRedirectPath = encodeURIComponent(redirectPath);
 
   const callbackURL = `${envVars.BETTER_AUTH_URL}/api/v1/auth/google/success?redirect=${encodedRedirectPath}`;
 
-  res.render("googleRedirect", {
-    callbackURL: callbackURL,
-    betterAuthUrl: envVars.BETTER_AUTH_URL,
-  })
+  const data = await auth.api.signInSocial({
+    body: {
+      provider: "google",
+      callbackURL,
+    },
+  });
+
+  if (!data?.url) {
+    throw new AppError(status.INTERNAL_SERVER_ERROR, "Failed to generate Google OAuth URL");
+  }
+
+  res.redirect(data.url);
 });
 
 const googleLoginSuccess = catchAsync(async (req: Request, res: Response) => {

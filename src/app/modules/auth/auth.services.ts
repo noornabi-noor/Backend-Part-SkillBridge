@@ -389,26 +389,34 @@ const googleLoginSuccess = async (session: Record<string, any>) => {
     where: { id: session.user.id }
   });
 
-  if (dbUser?.status === UserStatus.BANNED) {
-    throw new AppError(status.BAD_REQUEST, "User is banned!");
+  if (!dbUser) {
+    throw new AppError(status.NOT_FOUND, "User not found after Google OAuth flow!");
+  }
+
+  if (dbUser.status === UserStatus.BANNED) {
+    throw new AppError(status.FORBIDDEN, "Your account has been banned!");
+  }
+
+  if (dbUser.isDeleted || dbUser.status === UserStatus.DELETED) {
+    throw new AppError(status.FORBIDDEN, "Your account has been deleted!");
   }
 
   const accessToken = tokenUtils.getAccessToken({
-    userId: session.user.id,
-    role: dbUser?.role || session.user.role,
-    name: session.user.name,
-    email: session.user.email,
-    status: dbUser?.status || UserStatus.ACTIVE,
-    emailVerified: true
+    userId: dbUser.id,
+    role: dbUser.role as Role,
+    name: dbUser.name,
+    email: dbUser.email,
+    status: dbUser.status as UserStatus,
+    emailVerified: dbUser.emailVerified,
   });
 
   const refreshToken = tokenUtils.getRefreshToken({
-    userId: session.user.id,
-    role: dbUser?.role || session.user.role,
-    name: session.user.name,
-    email: session.user.email,
-    status: dbUser?.status || UserStatus.ACTIVE,
-    emailVerified: true
+    userId: dbUser.id,
+    role: dbUser.role as Role,
+    name: dbUser.name,
+    email: dbUser.email,
+    status: dbUser.status as UserStatus,
+    emailVerified: dbUser.emailVerified,
   });
 
   return {
