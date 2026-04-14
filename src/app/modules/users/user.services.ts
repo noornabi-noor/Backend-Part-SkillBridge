@@ -40,7 +40,7 @@ const createTutor = async (payload: ITutorCreatePayload) => {
   });
 
   if (!authUser || !authUser.user) {
-     throw new AppError(status.INTERNAL_SERVER_ERROR, "Failed to create user account");
+    throw new AppError(status.INTERNAL_SERVER_ERROR, "Failed to create user account");
   }
 
   try {
@@ -98,7 +98,7 @@ const createTutor = async (payload: ITutorCreatePayload) => {
     await prisma.user.delete({
       where: { id: authUser.user.id },
     }).catch(delErr => console.error("Rollback user deletion failed:", delErr));
-    
+
     if (error instanceof AppError) throw error;
     throw new AppError(status.INTERNAL_SERVER_ERROR, "Something went wrong during tutor registration");
   }
@@ -149,13 +149,13 @@ const getUserById = async (id: string): Promise<any> => {
       totalReviews === 0
         ? 0
         : parseFloat(
-            (
-              user.tutorProfile.reviews.reduce(
-                (sum: number, r: { rating: number }) => sum + r.rating,
-                0,
-              ) / totalReviews
-            ).toFixed(1),
-          );
+          (
+            user.tutorProfile.reviews.reduce(
+              (sum: number, r: { rating: number }) => sum + r.rating,
+              0,
+            ) / totalReviews
+          ).toFixed(1),
+        );
 
     return {
       ...user,

@@ -2,15 +2,18 @@ model Booking {
   id             String        @id @default(uuid())
   studentId      String
   tutorId        String
+  availabilityId String?
   status         BookingStatus @default(PENDING)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   scheduledEnd   DateTime
   scheduledStart DateTime
-  student        User          @relation("StudentBookings", fields: [studentId], references: [id])
-  tutor          TutorProfile  @relation("TutorBookings", fields: [tutorId], references: [id])
-  payment        Payment?
-  review         Review?
+
+  student      User          @relation("StudentBookings", fields: [studentId], references: [id])
+  tutor        TutorProfile  @relation("TutorBookings", fields: [tutorId], references: [id])
+  availability Availability? @relation(fields: [availabilityId], references: [id])
+  payment      Payment?
+  review       Review?
 
   @@index([tutorId, scheduledStart])
   @@map("bookings")

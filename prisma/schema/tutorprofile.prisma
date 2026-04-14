@@ -1,20 +1,20 @@
 model TutorProfile {
-  id              String          @id @default(uuid())
-  userId          String          @unique
-  bio             String?
-  pricePerHour    Float
-  experience      Float
-  rating          Float           @default(0)
-  totalReviews    Int             @default(0)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  stripeAccountId String?
-  availability    Availability[]
-  bookings        Booking[]       @relation("TutorBookings")
-  payments        Payment[]
-  reviews         Review[]
-  categories      TutorCategory[]
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String              @id @default(uuid())
+  userId              String              @unique
+  bio                 String?
+  pricePerHour        Float
+  experience          Float
+  rating              Float               @default(0)
+  totalReviews        Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  stripeAccountId     String?
+  tutorAvailabilities TutorAvailability[]
+  bookings            Booking[]           @relation("TutorBookings")
+  payments            Payment[]
+  reviews             Review[]
+  categories          TutorCategory[]
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("tutor_profiles")
 }

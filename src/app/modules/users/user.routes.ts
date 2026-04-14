@@ -13,11 +13,11 @@ router.get("/me", auth(), usersController.getCurrentUser);
 router.get("/", auth(userRoles.ADMIN), usersController.getAllUsers);
 
 router.post(
-  "/create-tutor",
-  multerUpload.single("image"),
-  formDataParser,
-  validateRequest(userValidation.createTutorValidationSchema),
-  usersController.createTutor,
+    "/create-tutor",
+    multerUpload.single("image"),
+    formDataParser,
+    validateRequest(userValidation.createTutorValidationSchema),
+    usersController.createTutor,
 );
 
 router.patch("/:id/status", auth(userRoles.ADMIN), validateRequest(userValidation.updateUserStatusValidationSchema), usersController.updateUserStatus);

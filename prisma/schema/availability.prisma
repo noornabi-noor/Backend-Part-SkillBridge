@@ -1,13 +1,27 @@
 model Availability {
-  id        String       @id @default(uuid())
-  tutorId   String
-  dayOfWeek Int
-  startTime String
-  endTime   String
-  isBooked  Boolean      @default(false)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  id            String              @id @default(uuid())
+  startDateTime DateTime
+  endDateTime   DateTime
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  tutorProfiles TutorAvailability[]
+  bookings      Booking[]
 
   @@map("availability")
+}
+
+model TutorAvailability {
+  tutorId        String
+  tutor          TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  availabilityId String
+  availability   Availability @relation(fields: [availabilityId], references: [id], onDelete: Cascade)
+
+  isBooked  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([tutorId, availabilityId])
+  @@index([tutorId])
+  @@index([availabilityId])
+  @@map("tutor_availability")
 }
