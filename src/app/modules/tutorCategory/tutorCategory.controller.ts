@@ -15,18 +15,14 @@ const createTutorCategory = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getTutorCategories = catchAsync(async (req: Request, res: Response) => {
-  const { tutorId, categoryId } = req.query;
-
-  const result = await tutorCategoryServices.getTutorCategories(
-    tutorId as string | undefined,
-    categoryId as string | undefined
-  );
+  const result = await tutorCategoryServices.getTutorCategories(req.query);
 
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,
     message: "Tutor categories fetched successfully",
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 

@@ -14,17 +14,14 @@ const createReview = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getReviews = catchAsync(async (req: Request, res: Response) => {
-  const { tutorId, studentId } = req.query;
-  const reviews = await reviewServices.getReviews(
-    tutorId as string | undefined,
-    studentId as string | undefined
-  );
+  const result = await reviewServices.getReviews(req.query);
 
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,
     message: "Reviews fetched successfully",
-    data: reviews,
+    meta: result.meta,
+    data: result.data,
   });
 });
 

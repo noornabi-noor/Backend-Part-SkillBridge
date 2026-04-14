@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { IBookingCreate, IBookingUpdate } from "./bookings.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
 const toMinutes = (time: string): number => {
   time = time.trim();
@@ -64,9 +65,15 @@ const createBooking = async (
   });
 };
 
-const getAllBookings = async (): Promise<any[]> => {
-  return prisma.booking.findMany({
-    include: {
+const getAllBookings = async (query: Record<string, any>): Promise<any> => {
+  const bookingQuery = new QueryBuilder(prisma.booking, query, {
+      filterableFields: ['status', 'tutorId', 'studentId']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate()
+  .include({
       tutor: {
         select: {
           id: true,
@@ -89,11 +96,9 @@ const getAllBookings = async (): Promise<any[]> => {
           email: true,
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
   });
+
+  return await bookingQuery.execute();
 };
 
 const getBookingById = async (bookingId: string): Promise<any> => {
@@ -207,4 +212,3 @@ export const bookingServices = {
   getUpcomingBookingsByTutor,
   getBookingsByStudent,
 };
-

@@ -1,6 +1,7 @@
 import { Review } from "../../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { IReviewCreate, IReviewUpdate } from "./review.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
 const createReview = async (data: IReviewCreate): Promise<any> => {
   const review = await prisma.review.create({
@@ -28,20 +29,23 @@ const createReview = async (data: IReviewCreate): Promise<any> => {
   return review;
 };
 
-const getReviews = async (tutorId?: string, studentId?: string): Promise<any[]> => {
-  return prisma.review.findMany({
-    where: {
-      ...(tutorId && { tutorId }),
-      ...(studentId && { studentId }),
-    },
-    include: {
+const getReviews = async (query: Record<string, any>): Promise<any> => {
+  const reviewQuery = new QueryBuilder(prisma.review, query, {
+      filterableFields: ['tutorId', 'studentId', 'rating']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate()
+  .include({
       student: true,
       tutor: {
         include: { user: true },
       },
       booking: true,
-    },
   });
+
+  return await reviewQuery.execute();
 };
 
 const updateReview = async (
@@ -122,4 +126,3 @@ export const reviewServices = {
   deleteReview,
   getReviewsByTutor
 };
-

@@ -49,13 +49,14 @@ const createBooking = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getAllBookings = catchAsync(async (_req: Request, res: Response) => {
-  const result = await bookingServices.getAllBookings();
+const getAllBookings = catchAsync(async (req: Request, res: Response) => {
+  const result = await bookingServices.getAllBookings(req.query);
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,
     message: "All bookings fetched successfully",
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 

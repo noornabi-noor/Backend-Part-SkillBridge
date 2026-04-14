@@ -3,13 +3,14 @@ import { adminServices } from "./admin.services";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 
-const getAllUsers = catchAsync(async (_req: Request, res: Response) => {
-  const users = await adminServices.getAllUsers();
+const getAllUsers = catchAsync(async (req: Request, res: Response) => {
+  const result = await adminServices.getAllUsers(req.query);
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,
     message: "Users fetched successfully",
-    data: users,
+    meta: result.meta,
+    data: result.data,
   });
 });
 
@@ -24,23 +25,25 @@ const updateUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getAllTutor = catchAsync(async (_req: Request, res: Response) => {
-  const staff = await adminServices.getAllTutor();
+const getAllTutor = catchAsync(async (req: Request, res: Response) => {
+  const result = await adminServices.getAllTutor(req.query);
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,
     message: "Tutors fetched successfully",
-    data: staff,
+    meta: result.meta,
+    data: result.data,
   });
 });
 
-const getAllBookings = catchAsync(async (_req: Request, res: Response) => {
-  const bookings = await adminServices.getAllBookings();
+const getAllBookings = catchAsync(async (req: Request, res: Response) => {
+  const result = await adminServices.getAllBookings(req.query);
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,
     message: "Bookings fetched successfully",
-    data: bookings,
+    meta: result.meta,
+    data: result.data,
   });
 });
 

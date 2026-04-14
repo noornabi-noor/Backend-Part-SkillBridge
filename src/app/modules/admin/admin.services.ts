@@ -1,12 +1,18 @@
 import { prisma } from "../../lib/prisma";
 import { ICategoryData, ICategoryUpdateData, IUserUpdate } from "./admin.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
-const getAllUsers = async () => {
-  return prisma.user.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+const getAllUsers = async (query: Record<string, any>) => {
+  const userQuery = new QueryBuilder(prisma.user, query, {
+      searchableFields: ['name', 'email'],
+      filterableFields: ['role', 'status']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate();
+
+  return await userQuery.execute();
 };
 
 const updateUser = async (userId: string, data: IUserUpdate) => {
@@ -16,9 +22,16 @@ const updateUser = async (userId: string, data: IUserUpdate) => {
   });
 };
 
-const getAllTutor = async () => {
-  return prisma.tutorProfile.findMany({
-    include: {
+const getAllTutor = async (query: Record<string, any>) => {
+  const tutorQuery = new QueryBuilder(prisma.tutorProfile, query, {
+      searchableFields: ['bio', 'user.name', 'user.email'],
+      filterableFields: ['pricePerHour', 'experience', 'rating']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate()
+  .include({
       user: {
         select: {
           id: true,
@@ -31,13 +44,20 @@ const getAllTutor = async () => {
           category: true,
         },
       },
-    },
   });
+
+  return await tutorQuery.execute();
 };
 
-const getAllBookings = async () => {
-  return prisma.booking.findMany({
-    include: {
+const getAllBookings = async (query: Record<string, any>) => {
+    const bookingQuery = new QueryBuilder(prisma.booking, query, {
+        filterableFields: ['status', 'tutorId', 'studentId']
+    })
+    .search()
+    .filter()
+    .sort()
+    .paginate()
+    .include({
       student: {
         select: {
           id: true,
@@ -55,11 +75,9 @@ const getAllBookings = async () => {
           },
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+    });
+
+    return await bookingQuery.execute();
 };
 
 const createCategory = async (data: ICategoryData) => {

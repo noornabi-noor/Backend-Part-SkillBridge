@@ -1,44 +1,25 @@
 import { Category } from "../../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
-import { ICategoryCreate, ICategoryUpdate } from "./categories.interface";
+import { ICategoryUpdate } from "./categories.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
 const createCategories = async (payload: Category): Promise<Category> => {
-  return await prisma.category.create({
+   return await prisma.category.create({
     data: payload,
   });
 };
 
-const getAllCategory = async (): Promise<any[]> => {
-  return await prisma.category.findMany({
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      name: true,
-      createdAt: true,
-      updatedAt: true,
-      tutors: {
-        select: {
-          tutor: {
-            select: {
-              id: true,
-              userId: true,
-              bio: true,
-              pricePerHour: true,
-              experience: true,
-              rating: true,
-              user: {
-                select: {
-                  name: true,
-                  image: true,
-                  email: true, 
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
+const getAllCategory = async (query: Record<string, any>): Promise<any> => {
+  const categoryQuery = new QueryBuilder(prisma.category, query, {
+      searchableFields: ['name'],
+      filterableFields: ['name']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate();
+
+  return await categoryQuery.execute();
 };
 
 const getSingleCategory = async (categoryId: string): Promise<any> => {
@@ -144,4 +125,3 @@ export const categoryServices = {
   updateCategory,
   deleteCategory,
 };
-

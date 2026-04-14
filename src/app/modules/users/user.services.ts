@@ -1,22 +1,30 @@
 import { UserStatus } from "../../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { IUserProfileUpdate, IUserStatusUpdate } from "./users.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
-const getAllUsers = async (): Promise<any[]> => {
-  return await prisma.user.findMany({
-    where: {
-      role: { in: ["STUDENT", "TUTOR"] },
-    },
-    orderBy: { createdAt: "desc" },
-    include: {
+const getAllUsers = async (query: Record<string, any>): Promise<any> => {
+  const userQuery = new QueryBuilder(prisma.user, query, {
+      searchableFields: ['name', 'email'],
+      filterableFields: ['role', 'status']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate()
+  .where({
+      role: { in: ["STUDENT", "TUTOR"] }
+  })
+  .include({
       tutorProfile: {
         include: {
           bookings: true,
           reviews: true,
         },
       },
-    },
   });
+
+  return await userQuery.execute();
 };
 
 const getUserById = async (id: string): Promise<any> => {
@@ -99,4 +107,3 @@ export const usersServices = {
   updateUserStatus,
   updateUserProfile,
 };
-

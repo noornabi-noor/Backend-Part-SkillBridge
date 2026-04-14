@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { IAvailabilityCreate, IAvailabilityUpdate } from "./availability.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
 const createAvailability = async (
   data: IAvailabilityCreate,
@@ -14,19 +15,15 @@ const createAvailability = async (
   });
 };
 
-const getAllAvailabilty = async (): Promise<any[]> => {
-  return await prisma.availability.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    select: {
-      id: true,
-      dayOfWeek: true,
-      startTime: true,
-      endTime: true,
-      isBooked: true,
-      createdAt: true,
-
+const getAllAvailabilty = async (query: Record<string, any>): Promise<any> => {
+  const availabilityQuery = new QueryBuilder(prisma.availability, query, {
+      filterableFields: ['dayOfWeek', 'isBooked', 'tutorId']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate()
+  .include({
       tutor: {
         select: {
           id: true,
@@ -42,8 +39,9 @@ const getAllAvailabilty = async (): Promise<any[]> => {
           },
         },
       },
-    },
   });
+
+  return await availabilityQuery.execute();
 };
 
 const getSingleAvailability = async (availabilityId: string): Promise<any> => {
@@ -149,4 +147,3 @@ export const availabilityServices = {
   deleteAvailability,
   getAvailabilityByTutor
 };
-

@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { ITutorProfileInput } from "./tutor.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
 const createTutorProfile = async (data: ITutorProfileInput, userId: string): Promise<any> => {
   return prisma.tutorProfile.upsert({
@@ -41,13 +42,17 @@ const createTutorProfile = async (data: ITutorProfileInput, userId: string): Pro
   });
 };
 
-const getAllTutors = async (): Promise<any[]> => {
-  return await prisma.tutorProfile.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      user: {
+const getAllTutors = async (query: Record<string, any>): Promise<any> => {
+  const tutorQuery = new QueryBuilder(prisma.tutorProfile, query, {
+      searchableFields: ['bio', 'user.name'],
+      filterableFields: ['pricePerHour', 'experience', 'categories.category.name']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate()
+  .include({
+    user: {
         select: {
           id: true,
           name: true,
@@ -62,8 +67,9 @@ const getAllTutors = async (): Promise<any[]> => {
         },
       },
       reviews: true,
-    },
   });
+
+  return await tutorQuery.execute();
 };
 
 const getSingleTutor = async (id: string): Promise<any> => {
@@ -280,4 +286,3 @@ export const tutorServices = {
   getSingleTutorByUserId,
   getTopRatedTutor,
 };
-

@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { ITutorCategoryCreate } from "./tutorCategory.interface";
+import { QueryBuilder } from "../../utils/queryBuilder";
 
 const addTutorToCategory = async (data: ITutorCategoryCreate): Promise<any> => {
   return prisma.tutorCategory.create({
@@ -7,16 +8,15 @@ const addTutorToCategory = async (data: ITutorCategoryCreate): Promise<any> => {
   });
 };
 
-const getTutorCategories = async (
-  tutorId?: string,
-  categoryId?: string,
-): Promise<any[]> => {
-  return prisma.tutorCategory.findMany({
-    where: {
-      ...(tutorId && { tutorId }),
-      ...(categoryId && { categoryId }),
-    },
-    include: {
+const getTutorCategories = async (query: Record<string, any>): Promise<any> => {
+  const tutorCategoryQuery = new QueryBuilder(prisma.tutorCategory, query, {
+      filterableFields: ['tutorId', 'categoryId']
+  })
+  .search()
+  .filter()
+  .sort()
+  .paginate()
+  .include({
       tutor: {
         select: {
           id: true,
@@ -31,8 +31,9 @@ const getTutorCategories = async (
           name: true,
         },
       },
-    },
   });
+
+  return await tutorCategoryQuery.execute();
 };
 
 const removeTutorFromCategory = async (id: string): Promise<any> => {
@@ -54,4 +55,3 @@ export const tutorCategoryServices = {
   getTutorCategories,
   removeTutorFromCategory,
 };
-
