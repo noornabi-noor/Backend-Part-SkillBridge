@@ -2,12 +2,9 @@ import { BookingStatus } from "../../../../generated/prisma/enums";
 
 export interface IBookingCreate {
   tutorId: string;
-  scheduledStart: Date;
-  scheduledEnd: Date;
+  availabilityId: string;
 }
 
 export interface IBookingUpdate {
-  scheduledStart?: Date;
-  scheduledEnd?: Date;
   status?: BookingStatus;
 }

@@ -1,24 +1,40 @@
-import { z } from "zod";
+import z from "zod";
 
-const createAvailabilityValidationSchema = z.object({
+const createAvailabilityZodSchema = z.object({
   body: z.object({
-    dayOfWeek: z.number().min(0, "Day must be at least 0 (Sunday)").max(6, "Day must be at most 6 (Saturday)"),
-    startTime: z.string().min(1, "Start time is required").regex(/^(\d{1,2}):(\d{2})\s?(AM|PM)?$/i, "Invalid time format. Use HH:MM or HH:MM AM/PM"),
-    endTime: z.string().min(1, "End time is required").regex(/^(\d{1,2}):(\d{2})\s?(AM|PM)?$/i, "Invalid time format. Use HH:MM or HH:MM AM/PM"),
-  }),
+    startDate: z.string().refine((date) => !isNaN(Date.parse(date)), {
+      message: "Invalid date format",
+    }),
+    endDate: z.string().refine((date) => !isNaN(Date.parse(date)), {
+      message: "Invalid date format",
+    }),
+    startTime: z.string().refine((time) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time), {
+      message: "Invalid time format (HH:MM)",
+    }),
+    endTime: z.string().refine((time) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time), {
+      message: "Invalid time format (HH:MM)",
+    }),
+  })
 });
 
-const updateAvailabilityValidationSchema = z.object({
+const updateAvailabilityZodSchema = z.object({
   body: z.object({
-    dayOfWeek: z.number().min(0).max(6).optional(),
-    startTime: z.string().regex(/^(\d{1,2}):(\d{2})\s?(AM|PM)?$/i, "Invalid time format").optional(),
-    endTime: z.string().regex(/^(\d{1,2}):(\d{2})\s?(AM|PM)?$/i, "Invalid time format").optional(),
-    isBooked: z.boolean().optional(),
-  }),
+    startDate: z.string().refine((date) => !isNaN(Date.parse(date)), {
+      message: "Invalid date format",
+    }).optional(),
+    endDate: z.string().refine((date) => !isNaN(Date.parse(date)), {
+      message: "Invalid date format",
+    }).optional(),
+    startTime: z.string().refine((time) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time), {
+      message: "Invalid time format (HH:MM)",
+    }).optional(),
+    endTime: z.string().refine((time) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time), {
+      message: "Invalid time format (HH:MM)",
+    }).optional(),
+  })
 });
 
 export const availabilityValidation = {
-  createAvailabilityValidationSchema,
-  updateBookingValidationSchema: updateAvailabilityValidationSchema, // Kept compatible name or standard
-  updateAvailabilityValidationSchema,
-};
+  createAvailabilityZodSchema,
+  updateAvailabilityZodSchema
+}

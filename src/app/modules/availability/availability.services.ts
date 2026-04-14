@@ -1,149 +1,145 @@
+import { addHours, addMinutes, format } from "date-fns";
+import { Prisma, Availability } from "../../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
-import { IAvailabilityCreate, IAvailabilityUpdate } from "./availability.interface";
+import { ICreateAvailabilityPayload, IUpdateAvailabilityPayload } from "./availability.interface";
+import { convertDateTime } from "./availability.utils";
+import { availabilityFilterableFields, availabilityIncludeConfig, availabilitySearchableFields } from "./availability.constant";
 import { QueryBuilder } from "../../utils/queryBuilder";
 
-const createAvailability = async (
-  data: IAvailabilityCreate,
-  tutorId: string,
-): Promise<any> => {
-  return await prisma.availability.create({
-    data: {
-      ...data,
-      dayOfWeek: Number(data.dayOfWeek),
-      tutorId,
-    },
-  });
-};
+const createAvailability = async (payload: ICreateAvailabilityPayload) => {
+  const { startDate, endDate, startTime, endTime } = payload;
 
-const getAllAvailabilty = async (query: Record<string, any>): Promise<any> => {
-  const availabilityQuery = new QueryBuilder(prisma.availability, query, {
-      filterableFields: ['dayOfWeek', 'isBooked', 'tutorId']
-  })
-  .search()
-  .filter()
-  .sort()
-  .paginate()
-  .include({
-      tutor: {
-        select: {
-          id: true,
-          bio: true,
-          pricePerHour: true,
-          experience: true,
-          rating: true,
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
-      },
-  });
+  const interval = 30; // 30 minute slots
 
-  return await availabilityQuery.execute();
-};
+  const currentDate = new Date(startDate);
+  const lastDate = new Date(endDate);
 
-const getSingleAvailability = async (availabilityId: string): Promise<any> => {
-  const availabilityData = await prisma.availability.findUnique({
-    where: {
-      id: availabilityId,
-    },
-  });
+  const availabilities = [];
 
-  if (!availabilityData) {
-    throw new Error("Cannot fetch availability data");
+  while (currentDate <= lastDate) {
+    const dateOnly = new Date(`${format(currentDate, "yyyy-MM-dd")}T00:00:00`);
+
+    const startDateTime = addMinutes(
+      addHours(
+        dateOnly,
+        Number(startTime.split(":")[0])
+      ),
+      Number(startTime.split(":")[1])
+    );
+
+    const endDateTime = addMinutes(
+      addHours(
+        dateOnly,
+        Number(endTime.split(":")[0])
+      ),
+      Number(endTime.split(":")[1])
+    );
+
+    while (startDateTime < endDateTime) {
+      const s = await convertDateTime(startDateTime);
+      const e = await convertDateTime(addMinutes(startDateTime, interval));
+
+      const availabilityData = {
+        startDateTime: s,
+        endDateTime: e
+      }
+
+      const existingAvailability = await prisma.availability.findFirst({
+        where: {
+          startDateTime: availabilityData.startDateTime,
+          endDateTime: availabilityData.endDateTime
+        }
+      })
+
+      if (!existingAvailability) {
+        const result = await prisma.availability.create({
+          data: availabilityData
+        })
+        availabilities.push(result);
+      }
+
+      startDateTime.setMinutes(startDateTime.getMinutes() + interval)
+    }
+
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  return await prisma.availability.findUnique({
-    where: {
-      id: availabilityId,
-    },
-    select: {
-      id: true,
-      dayOfWeek: true,
-      startTime: true,
-      endTime: true,
-      isBooked: true,
-      createdAt: true,
+  return availabilities;
+}
 
-      tutor: {
-        select: {
-          id: true,
-          bio: true,
-          pricePerHour: true,
-          experience: true,
-          rating: true,
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
-      },
-    },
+const getAllAvailabilities = async (query: Record<string, any>) => {
+  const queryBuilder = new QueryBuilder<Availability, Prisma.AvailabilityWhereInput, Prisma.AvailabilityInclude>(
+    prisma.availability,
+    query,
+    {
+      searchableFields: availabilitySearchableFields,
+      filterableFields: availabilityFilterableFields
+    }
+  )
+
+  const result = await queryBuilder
+    .search()
+    .filter()
+    .paginate()
+    .include(availabilityIncludeConfig) // Changed from dynamicInclude to include if QueryBuilder supports it
+    .sort()
+    .execute();
+
+  return result;
+}
+
+const getAvailabilityById = async (id: string) => {
+  const availability = await prisma.availability.findUnique({
+    where: { id },
+    include: availabilityIncludeConfig
   });
-};
+  return availability;
+}
 
-const updateAvailability = async (
-  availabilityId: string,
-  data: IAvailabilityUpdate,
-): Promise<any> => {
-  const availabilityData = await prisma.availability.findUnique({
-    where: { id: availabilityId },
-  });
+const updateAvailability = async (id: string, payload: IUpdateAvailabilityPayload) => {
+  const { startDate, endDate, startTime, endTime } = payload;
 
-  if (!availabilityData) {
-    throw new Error("Cannot fetch availability data");
-  }
+  const startDateOnly = new Date(`${format(new Date(startDate), 'yyyy-MM-dd')}T00:00:00`);
+  const endDateOnly = new Date(`${format(new Date(endDate), 'yyyy-MM-dd')}T00:00:00`);
 
-  return prisma.availability.update({
-    where: { id: availabilityId },
+  const startDateTime = addMinutes(
+    addHours(
+      startDateOnly,
+      Number(startTime.split(':')[0])
+    ),
+    Number(startTime.split(':')[1])
+  );
+
+  const endDateTime = addMinutes(
+    addHours(
+      endDateOnly,
+      Number(endTime.split(':')[0])
+    ),
+    Number(endTime.split(':')[1])
+  );
+
+  const updatedAvailability = await prisma.availability.update({
+    where: { id },
     data: {
-      ...(data.dayOfWeek !== undefined && {
-        dayOfWeek: Number(data.dayOfWeek),
-      }),
-      ...(data.startTime && { startTime: data.startTime }),
-      ...(data.endTime && { endTime: data.endTime }),
-      ...(data.isBooked !== undefined && { isBooked: data.isBooked }),
-    },
+      startDateTime: startDateTime,
+      endDateTime: endDateTime
+    }
   });
-};
 
-const deleteAvailability = async (avilabilityId: string): Promise<any> => {
-  return await prisma.availability.delete({
-    where: {
-      id: avilabilityId,
-    },
+  return updatedAvailability;
+}
+
+const deleteAvailability = async (id: string) => {
+  await prisma.availability.delete({
+    where: { id }
   });
-};
-
-const getAvailabilityByTutor = async (tutorId: string): Promise<any[]> => {
-  return prisma.availability.findMany({
-    where: {
-      tutorId,
-      isBooked: false,
-    },
-    select: {
-      id: true,
-      dayOfWeek: true,
-      startTime: true,
-      endTime: true,
-    },
-    orderBy: [
-      { dayOfWeek: "asc" },
-      { startTime: "asc" },
-    ],
-  });
-};
-
+  return true;
+}
 
 export const availabilityServices = {
   createAvailability,
-  getAllAvailabilty,
-  getSingleAvailability,
+  getAllAvailabilities,
+  getAvailabilityById,
   updateAvailability,
-  deleteAvailability,
-  getAvailabilityByTutor
-};
+  deleteAvailability
+}

@@ -1,84 +1,78 @@
 import { prisma } from "../../lib/prisma";
 import { IBookingCreate, IBookingUpdate } from "./bookings.interface";
 import { QueryBuilder } from "../../utils/queryBuilder";
-
-const toMinutes = (time: string): number => {
-  time = time.trim();
-
-  // 24-hour format HH:MM
-  const match24 = time.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
-  if (match24) {
-    const h = Number(match24[1]);
-    const m = Number(match24[2]);
-    return h * 60 + m;
-  }
-
-  // 12-hour format HH:MM AM/PM
-  const match12 = time.match(/^(\d{1,2}):([0-5]\d)\s?(AM|PM)$/i);
-  if (match12 && match12[1] && match12[2] && match12[3]) {
-    const h = Number(match12[1]);
-    const m = Number(match12[2]);
-    const period = match12[3].toUpperCase(); // safe now
-
-    let hours = h === 12 ? 0 : h;
-    if (period === "PM") hours += 12;
-    return hours * 60 + m;
-  }
-
-  throw new Error(`Invalid time format: ${time}`);
-};
+import AppError from "../../errorHelpers/appError";
+import status from "http-status";
 
 const createBooking = async (
   studentId: string,
-  data: IBookingCreate
+  payload: IBookingCreate
 ): Promise<any> => {
-  if (data.scheduledStart >= data.scheduledEnd) {
-    throw new Error("End time must be after start time");
-  }
-
-  // Overlap check
-  const overlapping = await prisma.booking.findFirst({
+  // 1. Find the specific availability slot for this tutor
+  const tutorAvailability = await prisma.tutorAvailability.findUnique({
     where: {
-      tutorId: data.tutorId,
-      status: { in: ["PENDING", "CONFIRMED"] },
-      OR: [
-        {
-          scheduledStart: { lt: data.scheduledEnd },
-          scheduledEnd: { gt: data.scheduledStart },
-        },
-      ],
+      tutorId_availabilityId: {
+        tutorId: payload.tutorId,
+        availabilityId: payload.availabilityId,
+      },
+    },
+    include: {
+      availability: true,
     },
   });
 
-  if (overlapping) {
-    throw new Error("This time slot is already booked for this tutor");
+  if (!tutorAvailability) {
+    throw new AppError(status.NOT_FOUND, "This availability slot does not exist for this tutor");
   }
 
-  return prisma.booking.create({
-    data: {
-      tutorId: data.tutorId,
-      studentId,
-      scheduledStart: data.scheduledStart,
-      scheduledEnd: data.scheduledEnd,
-      status: "PENDING",
-    },
+  if (tutorAvailability.isBooked) {
+    throw new AppError(status.CONFLICT, "This time slot has already been booked");
+  }
+
+  // 2. Perform booking within a transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // Create the booking
+    const booking = await tx.booking.create({
+      data: {
+        tutorId: payload.tutorId,
+        studentId: studentId,
+        availabilityId: payload.availabilityId,
+        scheduledStart: tutorAvailability.availability.startDateTime,
+        scheduledEnd: tutorAvailability.availability.endDateTime,
+        status: "PENDING",
+      },
+    });
+
+    // Mark the tutor's slot as booked
+    await tx.tutorAvailability.update({
+      where: {
+        tutorId_availabilityId: {
+          tutorId: payload.tutorId,
+          availabilityId: payload.availabilityId,
+        },
+      },
+      data: {
+        isBooked: true,
+      },
+    });
+
+    return booking;
   });
+
+  return result;
 };
 
 const getAllBookings = async (query: Record<string, any>): Promise<any> => {
   const bookingQuery = new QueryBuilder(prisma.booking, query, {
-      filterableFields: ['status', 'tutorId', 'studentId']
+    filterableFields: ['status', 'tutorId', 'studentId']
   })
-  .search()
-  .filter()
-  .sort()
-  .paginate()
-  .include({
+    .search()
+    .filter()
+    .sort()
+    .paginate()
+    .include({
       tutor: {
-        select: {
-          id: true,
-          bio: true,
-          pricePerHour: true,
+        include: {
           user: {
             select: {
               id: true,
@@ -96,7 +90,8 @@ const getAllBookings = async (query: Record<string, any>): Promise<any> => {
           email: true,
         },
       },
-  });
+      availability: true,
+    });
 
   return await bookingQuery.execute();
 };
@@ -105,13 +100,14 @@ const getBookingById = async (bookingId: string): Promise<any> => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
-      tutor: true,
+      tutor: { include: { user: true } },
       student: true,
+      availability: true,
     },
   });
 
   if (!booking) {
-    throw new Error("Booking not found");
+    throw new AppError(status.NOT_FOUND, "Booking not found");
   }
 
   return booking;
@@ -126,7 +122,7 @@ const updateBooking = async (
   });
 
   if (!booking) {
-    throw new Error("Booking not found");
+    throw new AppError(status.NOT_FOUND, "Booking not found");
   }
 
   return prisma.booking.update({
@@ -135,14 +131,26 @@ const updateBooking = async (
   });
 };
 
-
 const deleteBooking = async (bookingId: string): Promise<any> => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
   });
 
   if (!booking) {
-    throw new Error("Booking not found");
+    throw new AppError(status.NOT_FOUND, "Booking not found");
+  }
+
+  // If a booking is deleted, we should probably unbook the slot
+  if (booking.availabilityId) {
+    await prisma.tutorAvailability.update({
+      where: {
+        tutorId_availabilityId: {
+          tutorId: booking.tutorId,
+          availabilityId: booking.availabilityId
+        }
+      },
+      data: { isBooked: false }
+    });
   }
 
   return prisma.booking.delete({
@@ -155,50 +163,28 @@ const getBookingsByTutor = async (tutorProfileId: string): Promise<any[]> => {
     where: { tutorId: tutorProfileId },
     include: {
       student: {
-        select: { id: true, name: true },
+        select: { id: true, name: true, email: true },
       },
+      availability: true,
     },
-    orderBy: { createdAt: "desc" },
-  });
-};
-
-const getUpcomingBookingsByTutor = async (tutorProfileId: string): Promise<any[]> => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return prisma.booking.findMany({
-    where: {
-      tutorId: tutorProfileId,
-      scheduledStart: { gte: today },
-      status: { in: ["CONFIRMED", "PENDING"] },
-    },
-    include: { student: { select: { id: true, name: true } } },
-    orderBy: { scheduledStart: "asc" },
+    orderBy: { scheduledStart: "desc" },
   });
 };
 
 const getBookingsByStudent = async (studentId: string): Promise<any[]> => {
   return prisma.booking.findMany({
-    where: {
-      studentId: studentId,
-    },
+    where: { studentId },
     include: {
       tutor: {
-        select: {
-          id: true,
+        include: {
           user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
+            select: { id: true, name: true, image: true },
           },
         },
       },
+      availability: true,
     },
-    orderBy: {
-      scheduledStart: "desc",
-    },
+    orderBy: { scheduledStart: "desc" },
   });
 };
 
@@ -209,6 +195,5 @@ export const bookingServices = {
   updateBooking,
   deleteBooking,
   getBookingsByTutor,
-  getUpcomingBookingsByTutor,
   getBookingsByStudent,
 };

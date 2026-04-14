@@ -17,8 +17,8 @@ app.set("views", path.resolve(process.cwd(), 'src/app/templates'));
 
 const allowedOrigins = [
   envVars.APP_URL || "http://localhost:3000",
-  envVars.PROD_APP_URL, 
-].filter(Boolean); 
+  envVars.PROD_APP_URL,
+].filter(Boolean);
 
 app.use(
   cors({

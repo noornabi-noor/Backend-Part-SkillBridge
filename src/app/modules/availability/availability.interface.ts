@@ -1,12 +1,18 @@
-export interface IAvailabilityCreate {
-  dayOfWeek: number;
+export interface ICreateAvailabilityPayload {
+  startDate: string;
+  endDate: string;
   startTime: string;
   endTime: string;
 }
 
-export interface IAvailabilityUpdate {
-  dayOfWeek?: number;
-  startTime?: string;
-  endTime?: string;
-  isBooked?: boolean;
+export interface IUpdateAvailabilityPayload {
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ITutorAvailabilityPayload {
+  tutorId: string;
+  availabilityIds: string[];
 }

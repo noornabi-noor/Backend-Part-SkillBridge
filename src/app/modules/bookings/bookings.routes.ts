@@ -6,14 +6,26 @@ import { bookingValidation } from "./bookings.validation";
 
 const router = express.Router();
 
-router.get("/tutor/:id/upcoming", auth(userRoles.TUTOR), bookingController.getUpcomingBookingsByTutor);
-router.get("/student/me", auth(userRoles.STUDENT), bookingController.getMyBookings);
-router.get("/tutor/:tutorId/public", auth(userRoles.STUDENT), bookingController.getTutorPublicBookings);
-router.get("/tutor/:id", auth(userRoles.TUTOR), bookingController.getBookingsByTutor);
-router.get("/", auth(), bookingController.getAllBookings);
-router.get("/:id", auth(userRoles.ADMIN, userRoles.TUTOR), bookingController.getBookingById);
-router.post("/", auth(userRoles.STUDENT), validateRequest(bookingValidation.createBookingValidationSchema), bookingController.createBooking);
-router.patch("/:id", auth(userRoles.ADMIN, userRoles.TUTOR, userRoles.STUDENT), validateRequest(bookingValidation.updateBookingValidationSchema), bookingController.updateBooking);
-router.delete("/:id", auth(userRoles.ADMIN, userRoles.TUTOR), bookingController.deleteBooking);
+router.get("/me", auth(userRoles.STUDENT), bookingController.getMyBookings);
+router.get("/tutor/:id", auth(userRoles.TUTOR, userRoles.ADMIN), bookingController.getBookingsByTutor);
+router.get("/", auth(userRoles.ADMIN), bookingController.getAllBookings);
+router.get("/:id", auth(userRoles.ADMIN, userRoles.TUTOR, userRoles.STUDENT), bookingController.getBookingById);
+router.post(
+    "/",
+    auth(userRoles.STUDENT),
+    validateRequest(bookingValidation.createBookingValidationSchema),
+    bookingController.createBooking
+);
+router.patch(
+    "/:id",
+    auth(userRoles.ADMIN, userRoles.TUTOR, userRoles.STUDENT),
+    validateRequest(bookingValidation.updateBookingValidationSchema),
+    bookingController.updateBooking
+);
+router.delete(
+    "/:id",
+    auth(userRoles.ADMIN, userRoles.TUTOR),
+    bookingController.deleteBooking
+);
 
 export const bookingRoutes = router;

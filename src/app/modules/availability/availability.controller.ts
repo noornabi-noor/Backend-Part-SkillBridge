@@ -1,127 +1,69 @@
 import { Request, Response } from "express";
-import { availabilityServices } from "./availability.services";
+import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
+import { availabilityServices } from "./availability.services";
 
 const createAvailability = catchAsync(async (req: Request, res: Response) => {
-  const tutorId = req.user?.tutorProfileId;
-  if (!tutorId) {
-    sendResponse(res, {
-      httpStatusCode: 401,
-      success: false,
-      message: "Unauthorized",
-    });
-    return;
-  }
-
-  const result = await availabilityServices.createAvailability(req.body, tutorId);
+  const payload = req.body;
+  const result = await availabilityServices.createAvailability(payload);
   sendResponse(res, {
-    httpStatusCode: 201,
     success: true,
-    message: "Availability created successfully",
-    data: result,
+    httpStatusCode: status.CREATED,
+    message: "Availability slots generated successfully",
+    data: result
   });
 });
 
-const getAllAvailabilty = catchAsync(async (req: Request, res: Response) => {
-  const result = await availabilityServices.getAllAvailabilty(req.query);
+const getAllAvailabilities = catchAsync(async (req: Request, res: Response) => {
+  const query = req.query;
+  const result = await availabilityServices.getAllAvailabilities(query);
   sendResponse(res, {
-    httpStatusCode: 200,
     success: true,
-    message: "All availabilities fetched successfully",
-    meta: result.meta,
+    httpStatusCode: status.OK,
+    message: "Availabilities retrieved successfully",
     data: result.data,
+    meta: result.meta
   });
 });
 
-const getSingleAvailability = catchAsync(async (req: Request, res: Response) => {
+const getAvailabilityById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await availabilityServices.getSingleAvailability(id as string);
+  const result = await availabilityServices.getAvailabilityById(id as string);
   sendResponse(res, {
-    httpStatusCode: 200,
     success: true,
-    message: "Availability fetched successfully",
-    data: result,
+    httpStatusCode: status.OK,
+    message: "Availability retrieved successfully",
+    data: result
   });
 });
 
 const updateAvailability = catchAsync(async (req: Request, res: Response) => {
-  if (Object.keys(req.body).length === 0) {
-    sendResponse(res, {
-      httpStatusCode: 400,
-      success: false,
-      message: "No data provided to update",
-    });
-    return;
-  }
-
   const { id } = req.params;
-  const result = await availabilityServices.updateAvailability(id as string, req.body);
+  const payload = req.body;
+  const result = await availabilityServices.updateAvailability(id as string, payload);
   sendResponse(res, {
-    httpStatusCode: 200,
     success: true,
+    httpStatusCode: status.OK,
     message: "Availability updated successfully",
-    data: result,
+    data: result
   });
 });
 
 const deleteAvailability = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await availabilityServices.deleteAvailability(id as string);
+  await availabilityServices.deleteAvailability(id as string);
   sendResponse(res, {
-    httpStatusCode: 200,
     success: true,
+    httpStatusCode: status.OK,
     message: "Availability deleted successfully",
-    data: result,
   });
 });
 
-const getAvailabilityByTutor = catchAsync(async (req: Request, res: Response) => {
-  let tutorId = req.params.tutorId;
-  if (!tutorId) {
-    sendResponse(res, {
-      httpStatusCode: 400,
-      success: false,
-      message: "Tutor ID is required",
-    });
-    return;
-  }
-
-  const result = await availabilityServices.getAvailabilityByTutor(tutorId as string);
-  sendResponse(res, {
-    httpStatusCode: 200,
-    success: true,
-    message: "Tutor availability fetched successfully",
-    data: result,
-  });
-});
-
-const getMyAvailability = catchAsync(async (req: Request, res: Response) => {
-  const tutorId = req.user?.tutorProfileId;
-  if (!tutorId) {
-    sendResponse(res, {
-      httpStatusCode: 401,
-      success: false,
-      message: "Unauthorized",
-    });
-    return;
-  }
-
-  const result = await availabilityServices.getAvailabilityByTutor(tutorId);
-  sendResponse(res, {
-    httpStatusCode: 200,
-    success: true,
-    message: "My availability fetched successfully",
-    data: result,
-  });
-});
-
-export const availabiltyController = {
+export const availabilityController = {
   createAvailability,
-  getAllAvailabilty,
-  getSingleAvailability,
+  getAllAvailabilities,
+  getAvailabilityById,
   updateAvailability,
   deleteAvailability,
-  getAvailabilityByTutor,
-  getMyAvailability,
-};
+}
