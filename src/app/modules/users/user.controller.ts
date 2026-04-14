@@ -2,6 +2,32 @@ import { Request, Response } from "express";
 import { usersServices } from "./user.services";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
+import status from "http-status";
+import { uploadFileToCloudinary } from "../../config/cloudinary.config";
+
+
+const createTutor = catchAsync(async (req: Request, res: Response) => {
+  const payload = req.body;
+
+  if (req.file) {
+    const cloudinaryResponse = await uploadFileToCloudinary(
+      req.file.buffer,
+      req.file.originalname,
+    );
+    if (cloudinaryResponse) {
+      payload.tutor.image = cloudinaryResponse.secure_url;
+    }
+  }
+
+  const result = await usersServices.createTutor(payload);
+
+  sendResponse(res, {
+    httpStatusCode: status.CREATED,
+    success: true,
+    message: "Tutor registered successfully!",
+    data: result,
+  });
+});
 
 const getAllUsers = catchAsync(async (req: Request, res: Response) => {
   const result = await usersServices.getAllUsers(req.query);
@@ -29,7 +55,7 @@ const getCurrentUser = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) {
     const err = new Error("User not found!");
-    err.name = "NotFoundError"; // ensures errorHandler returns 404
+    err.name = "NotFoundError";
     throw err;
   }
 
@@ -44,8 +70,8 @@ const getCurrentUser = catchAsync(async (req: Request, res: Response) => {
 
 const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { status } = req.body;
-  const updatedUser = await usersServices.updateUserStatus(id as string, status);
+  const { status: userStatus } = req.body;
+  const updatedUser = await usersServices.updateUserStatus(id as string, { status: userStatus });
   sendResponse(res, {
     httpStatusCode: 200,
     success: true,
@@ -74,6 +100,7 @@ const updateUserProfile = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const usersController = {
+  createTutor,
   getAllUsers,
   getUserById,
   getCurrentUser,
