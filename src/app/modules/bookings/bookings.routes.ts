@@ -28,4 +28,10 @@ router.delete(
     bookingController.deleteBooking
 );
 
+router.post(
+    "/cancel-unpaid-bookings",
+    auth(userRoles.ADMIN),
+    bookingController.cancelUnpaidBookings
+);
+
 export const bookingRoutes = router;

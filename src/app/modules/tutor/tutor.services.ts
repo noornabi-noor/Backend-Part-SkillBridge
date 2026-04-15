@@ -67,7 +67,16 @@ const getAllTutors = async (query: Record<string, any>): Promise<any> => {
         },
       },
       reviews: true,
-  });
+      tutorAvailabilities: {
+        where: {
+          isBooked: false,
+        },
+        include: {
+          availability: true,
+        },
+        take: 3, // Show a few upcoming slots in the list
+      },
+    });
 
   return await tutorQuery.execute();
 };
@@ -92,12 +101,17 @@ const getSingleTutor = async (id: string): Promise<any> => {
           category: true,
         },
       },
-      availability: {
+      tutorAvailabilities: {
         where: {
           isBooked: false,
         },
+        include: {
+          availability: true,
+        },
         orderBy: {
-          dayOfWeek: "asc",
+          availability: {
+            startDateTime: "asc",
+          },
         },
       },
       reviews: {
@@ -216,11 +230,11 @@ export async function getTutorDashboardStats(userId: string): Promise<any> {
   }
 
   const bookings = await prisma.booking.findMany({
-    where: { tutorId: profile.userId },
+    where: { tutorId: profile.id },
   });
 
   const reviews = await prisma.review.findMany({
-    where: { tutorId: profile.userId },
+    where: { tutorId: profile.id },
   });
 
   const totalReviews = reviews.length;
@@ -260,6 +274,15 @@ const getSingleTutorByUserId = async (userId: string): Promise<any> => {
           category: true,
         },
       },
+      tutorAvailabilities: {
+        where: {
+          isBooked: false,
+        },
+        include: {
+          availability: true,
+        },
+      },
+      user: true,
     },
   });
 };

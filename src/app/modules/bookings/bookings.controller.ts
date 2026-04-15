@@ -110,6 +110,16 @@ const getMyBookings = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const cancelUnpaidBookings = catchAsync(async (req: Request, res: Response) => {
+  const result = await bookingServices.cancelUnpaidBookings();
+  sendResponse(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: result.message,
+    data: result.count,
+  });
+});
+
 export const bookingController = {
   createBooking,
   getAllBookings,
@@ -118,4 +128,5 @@ export const bookingController = {
   deleteBooking,
   getBookingsByTutor,
   getMyBookings,
+  cancelUnpaidBookings,
 };

@@ -8,6 +8,7 @@ import { userRoutes } from "../modules/users/user.routes";
 import { availabilityRoutes } from "../modules/availability/availability.routes";
 import { bookingRoutes } from "../modules/bookings/bookings.routes";
 import { TutorAvailabilityRoutes } from "../modules/tutorAvailability/tutorAvailability.routes";
+import { paymentRoutes } from "../modules/payment/payment.routes";
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use("/users", userRoutes);
 router.use("/availability", availabilityRoutes);
 router.use("/tutor-availability", TutorAvailabilityRoutes);
 router.use("/bookings", bookingRoutes);
+router.use("/payments", paymentRoutes);
 
 export const indexRoutes = router;

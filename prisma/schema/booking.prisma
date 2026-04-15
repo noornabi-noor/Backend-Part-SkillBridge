@@ -4,6 +4,7 @@ model Booking {
   tutorId        String
   availabilityId String?
   status         BookingStatus @default(PENDING)
+  paymentStatus  PaymentStatus  @default(PENDING)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   scheduledEnd   DateTime

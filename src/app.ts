@@ -9,11 +9,26 @@ import { notFound } from "./app/middleware/notFound";
 import { envVars } from "./app/config/env.config";
 import qs from "qs";
 import path from "path";
+import { paymentController } from "./app/modules/payment/payment.controller";
+import cron from "node-cron";
+import { bookingServices } from "./app/modules/bookings/bookings.services";
 
 const app = express();
+
+// Cron job to cancel unpaid bookings every 25 minutes
+cron.schedule("*/25 * * * *", async () => {
+  try {
+    console.log("Running cron job to cancel unpaid appointments...");
+    await bookingServices.cancelUnpaidBookings();
+  } catch (error: any) {
+    console.error("Error occurred while canceling unpaid appointments:", error.message);
+  }
+});
 app.set("query parser", (str: string) => qs.parse(str));
 app.set("view engine", "ejs");
 app.set("views", path.resolve(process.cwd(), 'src/app/templates'));
+
+app.post("/webhook", express.raw({ type: "application/json" }), paymentController.handleStripeWebhookEvent)
 
 const allowedOrigins = [
   envVars.APP_URL || "http://localhost:3000",

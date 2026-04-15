@@ -4,6 +4,8 @@ import { QueryBuilder } from "../../utils/queryBuilder";
 import AppError from "../../errorHelpers/appError";
 import status from "http-status";
 
+import { paymentServices } from "../payment/payment.services";
+
 const createBooking = async (
   studentId: string,
   payload: IBookingCreate
@@ -18,6 +20,7 @@ const createBooking = async (
     },
     include: {
       availability: true,
+      tutor: true,
     },
   });
 
@@ -30,9 +33,9 @@ const createBooking = async (
   }
 
   // 2. Perform booking within a transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const booking = await prisma.$transaction(async (tx) => {
     // Create the booking
-    const booking = await tx.booking.create({
+    const newBooking = await tx.booking.create({
       data: {
         tutorId: payload.tutorId,
         studentId: studentId,
@@ -40,6 +43,7 @@ const createBooking = async (
         scheduledStart: tutorAvailability.availability.startDateTime,
         scheduledEnd: tutorAvailability.availability.endDateTime,
         status: "PENDING",
+        paymentStatus: "PENDING",
       },
     });
 
@@ -56,10 +60,22 @@ const createBooking = async (
       },
     });
 
-    return booking;
+    return newBooking;
   });
 
-  return result;
+  // 3. Automatically initiate Stripe payment
+  const amount = tutorAvailability.tutor?.pricePerHour || 0;
+  // Stripe minimum is roughly $0.50 USD. For BDT, we should ensure it's at least ~60 BDT.
+  if (amount < 60) {
+    throw new AppError(status.BAD_REQUEST, "Tutor price is too low for Stripe payment. Minimum price must be at least 60 BDT.");
+  }
+
+  const paymentResult = await paymentServices.initiatePayment(booking.id);
+
+  return {
+    ...booking,
+    paymentUrl: paymentResult.checkoutUrl,
+  };
 };
 
 const getAllBookings = async (query: Record<string, any>): Promise<any> => {
@@ -188,6 +204,57 @@ const getBookingsByStudent = async (studentId: string): Promise<any[]> => {
   });
 };
 
+const cancelUnpaidBookings = async () => {
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+  // Find bookings that are PENDING and have PENDING payment status and are older than 30 minutes
+  const bookingsToCancel = await prisma.booking.findMany({
+    where: {
+      status: "PENDING",
+      paymentStatus: "PENDING",
+      createdAt: {
+        lt: thirtyMinutesAgo,
+      },
+    },
+  });
+
+  if (bookingsToCancel.length === 0) {
+    return {
+      message: "No unpaid bookings found to cancel",
+      count: 0
+    };
+  }
+
+  // Use transaction to ensure consistency
+  await prisma.$transaction(async (tx) => {
+    for (const booking of bookingsToCancel) {
+      // 1. Update Booking status to CANCELLED
+      await tx.booking.update({
+        where: { id: booking.id },
+        data: { status: "CANCELLED" },
+      });
+
+      // 2. Free up the slot in TutorAvailability
+      if (booking.availabilityId) {
+        await tx.tutorAvailability.update({
+          where: {
+            tutorId_availabilityId: {
+              tutorId: booking.tutorId,
+              availabilityId: booking.availabilityId,
+            },
+          },
+          data: { isBooked: false },
+        });
+      }
+    }
+  });
+
+  return {
+    message: `Successfully cancelled ${bookingsToCancel.length} unpaid bookings`,
+    count: bookingsToCancel.length
+  };
+};
+
 export const bookingServices = {
   createBooking,
   getAllBookings,
@@ -196,4 +263,5 @@ export const bookingServices = {
   deleteBooking,
   getBookingsByTutor,
   getBookingsByStudent,
+  cancelUnpaidBookings,
 };

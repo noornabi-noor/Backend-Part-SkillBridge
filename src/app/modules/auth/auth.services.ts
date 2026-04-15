@@ -127,8 +127,16 @@ const getMe = async (user: IRequestUser) => {
     include: {
       tutorProfile: {
         include: {
-          categories: true,
-          availability: true,
+          categories: {
+            include: {
+              category: true,
+            },
+          },
+          tutorAvailabilities: {
+            include: {
+              availability: true,
+            },
+          },
           reviews: true,
         }
       },
